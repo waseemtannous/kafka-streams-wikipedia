@@ -1,66 +1,68 @@
 from kafka import KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
 from json import dumps, loads
-from variables import *
 from sseclient import SSEClient as EventSource
+from kafka.errors import NoBrokersAvailable
 
 import time
 
-
-def serializer(message):
-    return message.encode('utf-8')
+BOOTSTRAP_SERVER = 'localhost:9092'
 
 
-topics = []
+def valueSerializer(data):
+    return dumps(data).encode('utf-8')
+    # return data.encode('utf-8')
+
+
+def keySerializer(data):
+    return data.encode('utf-8')
+
+
+def create_kafka_producer():
+    try:
+        producer = KafkaProducer(bootstrap_servers=BOOTSTRAP_SERVER,
+                                 value_serializer=valueSerializer,
+                                 key_serializer=keySerializer)
+    except NoBrokersAvailable:
+        print('No broker found at {}'.format(BOOTSTRAP_SERVER))
+        exit(1)
+        return None
+
+    if producer.bootstrap_connected():
+        print('Kafka producer connected!')
+        return producer
+    else:
+        print('Failed to establish connection!')
+        exit(1)
+
+
+def constructEvent(data):
+    return {
+        'serverName': data['server_name'],
+        'eventType': data['type'],
+        'bot': data['bot'],
+        'user': data['user'],
+    }
+
 
 if __name__ == '__main__':
-    # topicList = [
-    #     NewTopic(name='pageCreate', num_partitions=4, replication_factor=1)
-    # ]
-    adminClient = KafkaAdminClient(bootstrap_servers='localhost:9092')
-
-    # adminClient.create_topics(new_topics=topicList, validate_only=False)
-
-    # Create a Kafka producer
-    producer = KafkaProducer(bootstrap_servers=BROKER, value_serializer=serializer)
+    producer = create_kafka_producer()
 
     url = 'https://stream.wikimedia.org/v2/stream/recentchange'
-    source = EventSource(url)
-    value = 0
-    for event in source:
+
+    counter = 0
+
+    for event in EventSource(url):
         if event.event == 'message':
             try:
                 data = loads(event.data)
             except ValueError:
                 pass
             else:
-                topic = data['server_name']
-                producer.send("topics", value=data)
-                continue
-                print(topic)
-                if topic not in topics:
-                    adminClient.create_topics(new_topics=[NewTopic(name=topic, num_partitions=1, replication_factor=1)],
-                                              validate_only=False)
-                    topics.append(topic)
-                    producer.send("topics", value=topic)
+                # if data['type'] == 'edit':
+                # construct valid json event
+                eventToSend = constructEvent(data)
 
-                producer.send(topic, value=str(value))
-                value += 1
-
-    # for event in source:
-    #     if event.event == 'message':
-    #         try:
-    #             data = loads(event.data)
-    #         except ValueError:
-    #             pass
-    #         else:
-    #             topic = 'topics'
-    #             # print(topic)
-    #             # if topic not in topics:
-    #             #     adminClient.create_topics(new_topics=[NewTopic(name=topic, num_partitions=1, replication_factor=1)],
-    #             #                               validate_only=False)
-    #             #     topics.append(topic)
-    #             #     producer.send("topics", value=topic)
-    #
-    #             producer.send(topic, value=str(value))
-    #             value += 1
+                producer.send('recentChange', value=eventToSend, key=data['server_name'])
+                print(counter)
+                counter += 1
