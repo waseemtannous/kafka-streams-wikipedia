@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_ADVERTISED_HOST_NAME=localhost
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CREATE_TOPICS=topics:1:1
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+# KAFKA_CREATE_TOPICS="wikipedia:2:1, " will create a topic called wikipedia with replication factor of 1 and a partition count of 1 and.
+
+# cd to the directory where the script is located
+# pull images: docker-compose pull
+# run: docker-compose up -d
+# stop: docker-compose rm -s
