@@ -63,8 +63,6 @@ services:
   client:
     build:
       context: DataViewer/client
-      args: 
-        - BOOTSTRAP_SERVER=http://server:8000/stream
     ports:
       - "3000:3000"
     depends_on:
@@ -80,5 +78,6 @@ networks:
 
 # cd to the directory where the script is located
 # pull images: docker-compose pull
+# build: docker-compose build
 # run: docker-compose up -d
-# stop: docker-compose rm -s
+# stop: docker-compose down

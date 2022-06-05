@@ -13,9 +13,6 @@ class App extends Component {
     const key = event['key'];
     const value = event['value'];
 
-    // console.log(key, value);
-    // console.log(data);
-
     if (key != 'www.wikidata.org') {
       return;
     }

@@ -46,8 +46,12 @@ public class StreamWorkers {
     public static final ArrayList<KTable<Windowed<String>, Long>> editPageTablesBots = new ArrayList<>();
     public static final ArrayList<KTable<Windowed<String>, Long>> editPageTables = new ArrayList<>();
 
+    public static final ArrayList<KTable<Windowed<String>, Long>> revertPageTablesBots = new ArrayList<>();
+    public static final ArrayList<KTable<Windowed<String>, Long>> revertPageTables = new ArrayList<>();
+
     public static final ArrayList<KTable<Windowed<String>, JsonNode>> newPageTablesJoined = new ArrayList<>();
     public static final ArrayList<KTable<Windowed<String>, JsonNode>> editPageTablesJoined = new ArrayList<>();
+    public static final ArrayList<KTable<Windowed<String>, JsonNode>> revertPageTablesJoined = new ArrayList<>();
 
     public static final ArrayList<TimeWindows> timeWindows = new ArrayList<>();
 
@@ -55,7 +59,7 @@ public class StreamWorkers {
 
     static int[] timeWindowsValues = { 3600, 86400, 604800, 2629743 };
 
-    static String[] timeStamps = {"hour", "day", "week", "month"};
+    static String[] timeStamps = { "hour", "day", "week", "month" };
     static int topN = 5;
 
     public static Properties getProps() {
@@ -64,7 +68,7 @@ public class StreamWorkers {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, BootstrapServers);
 
         // instant commit
-//        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+        // props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
 
         // commit every 100ms
         props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100);
@@ -91,9 +95,9 @@ public class StreamWorkers {
     }
 
     public static void joinTablesBotsUsers(ArrayList<KTable<Windowed<String>, Long>> PageTables,
-                                           ArrayList<KTable<Windowed<String>, Long>> PageTablesBots,
-                                           ArrayList<KTable<Windowed<String>, JsonNode>> PageTablesJoined,
-                                           String type) {
+            ArrayList<KTable<Windowed<String>, Long>> PageTablesBots,
+            ArrayList<KTable<Windowed<String>, JsonNode>> PageTablesJoined,
+            String type) {
         String[] timeFrames = { "hour", "day", "week", "month" };
         for (int i = 0; i < PageTables.size(); i++) {
             KTable<Windowed<String>, Long> PageTable = PageTables.get(i);
@@ -117,8 +121,7 @@ public class StreamWorkers {
                 if (leftValue <= 0 && rightValue <= 0) {
                     jsonNode.put("userRelative", 0);
                     jsonNode.put("botRelative", 0);
-                }
-                else {
+                } else {
                     jsonNode.put("userRelative", ((double) leftValue / (double) (leftValue + rightValue) * 100.0f));
                     jsonNode.put("botRelative", ((double) rightValue / (double) (leftValue + rightValue) * 100.0f));
                 }
@@ -129,7 +132,8 @@ public class StreamWorkers {
             });
             joined.toStream()
                     .map((wk, v) -> new KeyValue<>(wk.key(), v))
-                    .to(outputTopic, Produced.with(Serdes.String(), Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())));
+                    .to(outputTopic, Produced.with(Serdes.String(),
+                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())));
             PageTablesJoined.add(joined);
         }
     }
@@ -143,8 +147,8 @@ public class StreamWorkers {
             int finalJ = j;
             TimeWindows timeWindow = timeWindows.get(j);
 
-            final Comparator<JsonNode> comparator =
-                    (o1, o2) -> (int) (o2.get("count").asLong() - o1.get("count").asLong());
+            final Comparator<JsonNode> comparator = (o1,
+                    o2) -> (int) (o2.get("count").asLong() - o1.get("count").asLong());
 
             KTable<String, JsonNode> top5 = kStream
                     .filter((k, v) -> v.get("bot").asBoolean() == isBot)
@@ -153,7 +157,8 @@ public class StreamWorkers {
                         String serverName = v.get("serverName").asText();
                         return new KeyValue<>(user + "---" + serverName, v);
                     })
-                    .groupByKey(Grouped.with(Serdes.String(), Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())))
+                    .groupByKey(Grouped.with(Serdes.String(),
+                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())))
                     .windowedBy(timeWindow)
                     .count()
                     .groupBy((windowedUser, count) -> {
@@ -182,8 +187,9 @@ public class StreamWorkers {
                                 return queue;
                             },
 
-                            Materialized.with(Serdes.String(), new PriorityQueueSerde<>(comparator, Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())))
-                    )
+                            Materialized.with(Serdes.String(),
+                                    new PriorityQueueSerde<>(comparator,
+                                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer()))))
                     .mapValues(queue -> {
                         ObjectNode jsonNode = new ObjectMapper().createObjectNode();
                         List<ObjectNode> array = new ArrayList<>();
@@ -221,7 +227,8 @@ public class StreamWorkers {
                         String newKey = k.split("----")[0];
                         return new KeyValue<>(newKey, v);
                     })
-                    .to(outputTopic, Produced.with(Serdes.String(), Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())));
+                    .to(outputTopic, Produced.with(Serdes.String(),
+                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())));
         }
     }
 
@@ -230,8 +237,8 @@ public class StreamWorkers {
             int finalJ = j;
             TimeWindows timeWindow = timeWindows.get(j);
 
-            final Comparator<JsonNode> comparator =
-                    (o1, o2) -> (int) (o2.get("count").asLong() - o1.get("count").asLong());
+            final Comparator<JsonNode> comparator = (o1,
+                    o2) -> (int) (o2.get("count").asLong() - o1.get("count").asLong());
 
             KTable<String, JsonNode> top5 = kStream
                     .map((k, v) -> {
@@ -239,7 +246,8 @@ public class StreamWorkers {
                         String serverName = v.get("serverName").asText();
                         return new KeyValue<>(page + "---" + serverName, v);
                     })
-                    .groupByKey(Grouped.with(Serdes.String(), Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())))
+                    .groupByKey(Grouped.with(Serdes.String(),
+                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())))
                     .windowedBy(timeWindow)
                     .count()
                     .groupBy((windowedPage, count) -> {
@@ -267,8 +275,9 @@ public class StreamWorkers {
                                 return queue;
                             },
 
-                            Materialized.with(Serdes.String(), new PriorityQueueSerde<>(comparator, Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())))
-                    )
+                            Materialized.with(Serdes.String(),
+                                    new PriorityQueueSerde<>(comparator,
+                                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer()))))
                     .mapValues(queue -> {
                         ObjectNode jsonNode = new ObjectMapper().createObjectNode();
                         List<ObjectNode> array = new ArrayList<>();
@@ -305,23 +314,23 @@ public class StreamWorkers {
                         String newKey = k.split("----")[0];
                         return new KeyValue<>(newKey, v);
                     })
-                    .to(outputTopic, Produced.with(Serdes.String(), Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())));
+                    .to(outputTopic, Produced.with(Serdes.String(),
+                            Serdes.serdeFrom(new JsonSerializer(), new JsonDeserializer())));
         }
     }
 
     public static void main(String[] args) {
 
-//        sleep 10 sec
+        // sleep 10 sec
         try {
             Thread.sleep(10000);
-        }
-        catch (InterruptedException e) {
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
         BootstrapServers = System.getenv("BOOTSTRAP_SERVER");
 
-//        BasicConfigurator.configure();
+        // BasicConfigurator.configure();
 
         logger.info("consumer started ...");
 
@@ -344,16 +353,18 @@ public class StreamWorkers {
         initTables(newPageTablesBots, "new", true);
         initTables(editPageTables, "edit", false);
         initTables(editPageTablesBots, "edit", true);
+        initTables(revertPageTables, "revert", false);
+        initTables(revertPageTablesBots, "revert", true);
 
-//         join tables
-         joinTablesBotsUsers(newPageTables, newPageTablesBots, newPageTablesJoined, "new");
-         joinTablesBotsUsers(editPageTables, editPageTablesBots, editPageTablesJoined, "edit");
+        // join tables
+        joinTablesBotsUsers(newPageTables, newPageTablesBots, newPageTablesJoined, "new");
+        joinTablesBotsUsers(editPageTables, editPageTablesBots, editPageTablesJoined, "edit");
+        joinTablesBotsUsers(revertPageTables, revertPageTablesBots, revertPageTablesJoined, "revert");
 
         topFiveUsersBots(true);
         topFiveUsersBots(false);
 
         topFivePages();
-
 
         // create topology and start stream
         Topology topology = streamsBuilder.build();
