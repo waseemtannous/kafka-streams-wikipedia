@@ -1,2 +1,4 @@
 kafka-python==2.0.2
 sseclient==0.0.27
+websockets~=10.3
+Flask~=2.1.2

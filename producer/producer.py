@@ -1,17 +1,17 @@
+import os
+
 from kafka import KafkaProducer
-from kafka.admin import KafkaAdminClient, NewTopic
 from json import dumps, loads
 from sseclient import SSEClient as EventSource
 from kafka.errors import NoBrokersAvailable
 
 import time
 
-BOOTSTRAP_SERVER = 'localhost:9092'
+BOOTSTRAP_SERVER = os.environ.get('BOOTSTRAP_SERVER', 'localhost:9092')
 
 
 def valueSerializer(data):
     return dumps(data).encode('utf-8')
-    # return data.encode('utf-8')
 
 
 def keySerializer(data):
@@ -42,15 +42,17 @@ def constructEvent(data):
         'eventType': data['type'],
         'bot': data['bot'],
         'user': data['user'],
+        'page': data['meta']['uri'],
     }
 
 
 if __name__ == '__main__':
+    time.sleep(10)
     producer = create_kafka_producer()
 
     url = 'https://stream.wikimedia.org/v2/stream/recentchange'
 
-    counter = 0
+    print('Connecting to {}'.format(url))
 
     for event in EventSource(url):
         if event.event == 'message':
@@ -59,10 +61,7 @@ if __name__ == '__main__':
             except ValueError:
                 pass
             else:
-                # if data['type'] == 'edit':
-                # construct valid json event
                 eventToSend = constructEvent(data)
 
                 producer.send('recentChange', value=eventToSend, key=data['server_name'])
-                print(counter)
-                counter += 1
+                time.sleep(0.1)
